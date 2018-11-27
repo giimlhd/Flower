@@ -1,0 +1,142 @@
+"use strict";
+/* Hua.com Mobile javascript
+ * ModifyTime:2018-8-23 16:43:17
+ * ModifyLog: 新增推广百度  "&bd_vid=" + this.urlparam.bd_vid
+ * 拦截客服链接，跳转到 洽美
+ */
+
+//百度推广统计
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?ae896b60487020696d3df0e260c080bf";
+  var s = document.getElementsByTagName("script")[0];
+  s.parentNode.insertBefore(hm, s);
+})();
+
+//<!-- Google Tag Manager -->
+(function (w, d, s, l, i) {
+    w[l] = w[l] || [];
+    w[l].push({
+        'gtm.start': new Date().getTime(),
+        event: 'gtm.js'
+    });
+    var f = d.getElementsByTagName(s)[0],
+        j = d.createElement(s),
+        dl = l != 'dataLayer' ? '&l=' + l : '';
+    j.async = true;
+    j.src =
+        'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+    f.parentNode.insertBefore(j, f);
+})(window, document, 'script', 'dataLayer', 'GTM-KS4PTHC');
+
+//Hua 对象
+function Hua() {
+  this.urlparam = {
+    sid: "",
+    u_id: "",
+  };
+  this.sessionId = null;
+  this.isWechat = false;
+  this._init = function() {
+    var kv = location.search.slice(1).split("&");
+    for (var i = 0; i < kv.length; i++) {
+      var index = kv[i].indexOf("=");
+      if (index == -1) {
+        continue;
+      }
+      this.urlparam[kv[i].slice(0, index)] = kv[i].slice(index + 1);
+    }
+    //hideTopBanner
+    if (this.urlparam.sid == "xxbtg" || this.urlparam.sid == 'dxgzh') {
+      $.cookie('HomeTopBannerHide', '1', {
+        expires: 1,
+        path: '/'
+      });
+    }
+    //Sid 特殊来源定制首页
+    if (this.urlparam.sid == 'dxgzh') {
+      $('.entrance>li:first').remove();
+      $('.entrance>li').css('width', '100%');
+    }
+    $("#btnTopClose").click(function(e) {
+      $("#topBanner").remove();
+      $.cookie('HomeTopBannerHide', '1', {
+        expires: 1,
+        path: '/'
+      });
+    });
+    var $goTop = $(".float-btn > a[data-action='goTop']");
+    $goTop.click(function() {
+      $("html,body").animate({
+        scrollTop: 0
+      }, 300);
+    });
+    $(document).scroll(function() {
+      var $scrollTop = $(this).scrollTop();
+      //ToggleFloatBtn GoTop
+      if ($scrollTop >= window.screen.height) {
+        $goTop.addClass("show");
+      } else {
+        $goTop.removeClass("show");
+      }
+    });
+    //MainBannerController
+    var mainBanner = new Swiper('#mainBanner', {
+      pagination: "#mainBanner .swiper-pagination",
+      paginationClickable: true,
+      autoplay: 3500,
+      loop: true
+    });
+  };
+  this.lazyloadImg = function() {
+    var selector = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : "img[data-original]";
+    var threshold = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 100;
+
+    $(selector).lazyload({
+      effect: "fadeIn",
+      threshold: threshold,
+      placeholder: "//img02.hua.com/m/pro_detail/375x409.png"
+    });
+  };
+  this.isShowTopBanner = function() {
+    var bool = $.cookie("HomeTopBannerHide");
+    var ua = navigator.userAgent.toLowerCase();
+    var isWechat = ua.match(/MicroMessenger/i) !== null ? true : false;;
+    if (bool || isWechat) {
+      $("#topBanner").remove();
+    } else {
+      $("#topBanner").show();
+    }
+  };
+  this.getHomeData = function() {
+    var c = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : "";
+    $.post("/home/indexdatas", {
+      c: c
+    }, function(data) {
+      if (data.Status == 0) {
+        data = data.Datas;
+        $("#pjCount").text(data.CommentCount);
+          if (data.IsLogin) {
+              $(".header-user-notice").show();
+              $(".header-user-login").hide();
+          }
+          else {
+              $(".header-user-notice").hide();
+              $(".header-user-login").show();
+          }
+        if (data.GwcCount > 0) {
+          $("#gwcCount").text(data.GwcCount).show();
+        }
+      }
+    });
+  };
+  //
+  this._init();
+  this.isShowTopBanner();
+  this.lazyloadImg();
+  this.getHomeData();
+}
+$(function() {
+  var hua = new Hua();
+})

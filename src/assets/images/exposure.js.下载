@@ -1,0 +1,141 @@
+/**
+ * Exposure 0.0.2.beta
+ * 产品曝光率统计对象
+ * 调用说明：
+ *
+ *
+    //初始化传入的jQuery选择器配合attrName 属性可以实现自定义列表的曝光率统计
+    var exp = new Exprosure('jQuery选择器',{
+        url: "", //poast 提交链接
+        pidLength: 7, //产品ID长度限制，一般无需更改
+        attrName: "href", //获取产品ID的属性名称，默认为a链接的href,一般无需更改
+        offsetTop: 0,//视图窗口顶部偏移，针对于有顶部或底部浮动元素的页面，一般无需更改
+        offsetBottom: 0,//视图窗口低部偏移，针对于有顶部或底部浮动元素的页面，一般无需更改
+        delay: 1200,//延迟数据提交，停止滚动后多长时间发送数据，最小,600ms，一般无需更改
+        paramKey: "ges",//后端接受参数的键名
+        success: function(viewData) {},//提交成功的回调函数
+    });
+
+ * http://www.hua.com/
+ *
+ * Copyright 2018, Wenhao Zeng
+ *
+ * Released on: 2018-11-9 10:58:02
+ */
+function Exprosure(selector, config, $) {
+    if(typeof(window.jQuery) != "function") {
+        console.error("$(jQuery) is not defined");
+    }
+    if(!selector || typeof(selector) != "string") {
+        console.error("Selector 必须为选择器的字符串类型");
+    }
+    config = config||{};
+    //流程
+    $ = window.jQuery;
+    var _this = this;
+    function judgeTop(scrollTop) {
+        for(var i = 0; i < _this.offsetTop.length; i++) {
+            if(!_this.$el[i].isView && _this.offsetTop[i] + _this.offsetH[i] - _this.config.offsetTop >= scrollTop && _this.offsetTop[i] < (scrollTop + _this.config.innerHeight - _this.config.offsetBottom)) {
+                _this.$el[i].isView = true;
+                var pid = $(_this.$el[i]).attr(_this.config.attrName)||'';
+                pid = pid.match(/\d{7}/gi);
+                if(pid==null){
+                  return false;
+                }
+                pid = pid[0];
+                if(pid.length !== _this.config.pidLength) {
+                    return false;
+                }
+                if(_this.viewData["p" + pid] == null) {
+                    _this.viewData["p" + pid] = 1;
+                } else {
+                    _this.viewData["p" + pid]++;
+                }
+            } else if(_this.$el[i].isView && (_this.offsetTop[i] + _this.offsetH[i] - _this.config.offsetTop < scrollTop || _this.offsetTop[i] >= (scrollTop + _this.config.innerHeight - _this.config.offsetBottom))) {
+                _this.$el[i].isView = false;
+            }
+        }
+    }
+    //初始化函数
+    this.reset = function(selector, config) {
+        //debugger;
+        if(config){
+            this.config = {
+                url: config.url||this.config.url,
+                pidLength: config.pidLength||(this.config?this.config.pidLength:7),
+                attrName: config.attrName||(this.config?this.config.attrName:"href"),
+                innerHeight: $(window).height(),
+                offsetTop: config.offsetTop||(this.config?this.config.offsetTop:0),
+                offsetBottom: config.offsetBottom||(this.config?this.config.offsetBottom:0),
+                delay: config.delay||(this.config?this.config.delay:800),
+                paramKey: config.paramKey||(this.config?this.config.paramKey:'ges'),
+                success: config.success||(this.config?this.config.success:function(viewData) {}),
+                selector: selector||config.selector||(this.config?this.config.selector:""),
+                scrollObj:config.scrollObj||(this.config?this.config.scrollObj:window),
+            };
+        }else{
+            this.config.selector = selector;
+        }
+        this.$el = $(this.config.selector);
+        if(this.$el.length==0){
+            console.warn(this);
+            console.error("The elements length is 0, and may be a selector error");
+            return false;
+        }
+        this.offsetTop = [];
+        this.offsetH = [];
+        this.viewData = this.viewData||[];
+        for(var i = 0; i < this.$el.length; i++) {
+            this.offsetTop.push(this.$el.eq(i).offset().top);
+            this.offsetH.push(this.$el.eq(i).height());
+        }
+    }
+    //配置检测函数
+    this.configVerify = function() {
+        this.config.delay = this.config.delay < 600 ? 600 : this.config.delay;
+        if(this.config.url == "") {
+            console.error("Post Url is not defined");
+        }
+    }
+    //上一次浏览数据
+    this.pervStr = "";
+    //数据提交函数
+    this.post = function() {
+        var str = "";
+        for(var key in this.viewData) {
+            str += key.slice(1) + "," + this.viewData[key] + ";";
+        }
+        this.viewData = [];
+        if(str == "" || this.pervStr == str) {
+            return;
+        }
+        this.pervStr = str;
+        var data = {};
+        data[this.config.paramKey] = str;
+        //console.log(str);
+        $.post(this.config.url, data, this.config.success.bind(null, str));
+    }
+    //初始化
+    this.reset(selector,config);
+    this.configVerify();
+    //计时器
+    this.timer = null;
+    $(window).scroll(function(e) {
+        var scrollTop = this.pageYOffset;
+        pervScrollTop = scrollTop;
+        judgeTop(scrollTop);
+        //clear
+        clearTimeout(this.timer);
+        this.timer = null;
+        this.timer = setTimeout(function() {
+            _this.post();
+        }, _this.config.delay);
+    });
+    $(window).on("touchstart,touchmove,touchend", function(e) {
+        clearTimeout(this.timer);
+        this.timer = null;
+    });
+    $(window).on("unload", function() {
+        _this.post();
+    })
+}
